@@ -1,4 +1,5 @@
 import { saveToken } from '../data/storage.js';
+import { syncAssignments } from '../data/syncService.js';
 import { setAuth, setSyncStatus } from '../state.js';
 
 function getTokenValue() {
@@ -22,7 +23,7 @@ async function persistTokenFromInput() {
   setAuth({ token, tokenSaved: true });
 }
 
-function onTokenSyncAttempt() {
+async function onTokenSyncAttempt() {
   const token = getTokenValue();
 
   if (!token) {
@@ -32,7 +33,11 @@ function onTokenSyncAttempt() {
     return;
   }
 
-  setSyncStatus({ lastError: null });
+  try {
+    await syncAssignments({ token });
+  } catch {
+    // Sync service already updates sync status with a normalized error.
+  }
 }
 
 export function bindEvents() {
@@ -56,8 +61,8 @@ export function bindEvents() {
   }
 
   if (syncButton && !syncButton.dataset.bound) {
-    syncButton.addEventListener('click', () => {
-      onTokenSyncAttempt();
+    syncButton.addEventListener('click', async () => {
+      await onTokenSyncAttempt();
     });
     syncButton.dataset.bound = 'true';
   }
