@@ -10,6 +10,6 @@ export function renderApp(state) {
   renderTokenSync(auth);
   renderStatus(sync, auth);
   renderFilters(ui);
-  renderList(library);
+  renderList(library, ui);
   bindEvents(state);
 }
