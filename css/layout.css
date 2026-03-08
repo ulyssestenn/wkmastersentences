@@ -1,0 +1,15 @@
+.app-header,
+.app-main {
+  width: min(960px, 100% - 2rem);
+  margin-inline: auto;
+}
+
+.app-header {
+  padding: 1.5rem 0 0.5rem;
+}
+
+.app-main {
+  display: grid;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
