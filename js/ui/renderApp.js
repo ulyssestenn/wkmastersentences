@@ -4,8 +4,10 @@ import { renderStatus } from './renderStatus.js';
 import { bindEvents } from './events.js';
 
 export function renderApp(state) {
-  renderStatus(state);
-  renderFilters(state);
-  renderList(state);
+  const { sync, ui, library } = state;
+
+  renderStatus(sync);
+  renderFilters(ui);
+  renderList(library);
   bindEvents(state);
 }

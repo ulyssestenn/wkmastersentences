@@ -1,6 +1,6 @@
-export function renderList(state) {
+export function renderList(libraryState) {
   const container = document.querySelector('#results-content');
   if (!container) return;
 
-  container.textContent = `${state.results.length} item(s)`;
+  container.textContent = `${libraryState.items.length} item(s)`;
 }
