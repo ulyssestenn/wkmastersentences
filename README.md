@@ -1,177 +1,100 @@
-# wkmastersentences
-Extracts Example Sentences for Mastered WankiKani Vocabulary and Creates Audio
+# WaniKani Master Sentences
 
-# WaniKani Master+ Sentence Miner
+A small, browser-only app for building a local library of **WaniKani Master+ vocabulary and kana vocabulary** with their **context sentences**.
 
-A small local tool that extracts **example sentences for all WaniKani vocabulary currently at Master level or higher** and lets you browse and play them with browser TTS.
+## What this app does
 
-This tool runs **entirely on your own machine**.  
-No server, no accounts, and no data leaves your computer except requests you make directly to the WaniKani API.
-
-The goal is simple:
-
-> Surface high-quality example sentences only for vocabulary you already know well.
-
----
-
-# Features
-
-- Fetches all **vocabulary and kana vocabulary currently at Master+**
-- Extracts **WaniKani example sentences**
-- Simple searchable sentence library
-- Japanese sentence playback using **browser TTS**
-- Optional English translation display
-- Runs **locally in your browser**
-- No installation or build step required
+- Fetches your WaniKani assignments for:
+  - `vocabulary`
+  - `kana_vocabulary`
+- Filters to SRS stages **7, 8, 9** (Master, Enlightened, Burned).
+- Fetches matching subject records.
+- Extracts and displays `context_sentences` (Japanese + English).
+- Stores token + synced library data in your browser so you can reopen later.
 
 ---
 
-# Why This Exists
+## Run locally
 
-WaniKani includes good example sentences, but they are buried inside the lesson/review interface.
+### Option 1: Open file directly (quickest)
 
-Once a word reaches **Master**, you likely know it well enough to begin encountering it in natural sentences. This tool collects those sentences into a single library so you can:
+Open `index.html` in your browser.
 
-- listen to them
-- shadow them
-- browse them
-- reinforce known vocabulary through context
+- macOS: `open index.html`
+- Linux: `xdg-open index.html`
+- Windows (PowerShell): `start index.html`
 
----
+### Option 2 (recommended): Serve as local static files
 
-# Requirements
+From the repository root:
 
-You need:
+```bash
+python3 -m http.server 8000
+```
 
-- A **WaniKani account**
-- A **WaniKani API token**
-- A modern browser (Chrome, Edge, Firefox, Safari)
+Then open:
 
----
+- `http://localhost:8000`
 
-# Getting Your API Token
+Alternative (Node):
 
-1. Log into WaniKani  
-2. Go to:
-
-https://www.wanikani.com/settings/personal_access_tokens
-
-3. Create a **Read-only token**
-
-The token should have access to:
-
-- assignments
-- subjects
+```bash
+npx serve .
+```
 
 ---
 
-# Installation
+## Token storage behavior
 
-Download the repository:
+Your WaniKani API token is stored **browser-local only** (IndexedDB in this app).
 
-
-git clone https://github.com/ulyssestenn/wkmastersentences
-
-
-Or download the ZIP from GitHub and extract it.
+- No backend server is used by this project.
+- Token is not synced by this app to any cloud service.
+- Clearing browser site data (or using another browser/profile) removes access to the saved token.
 
 ---
 
-# Running the App
+## Data fetched from WaniKani
 
-Open:
+The app fetches only what it needs for Master+ sentence browsing:
 
-index.html
+1. `GET /v2/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9`
+2. `GET /v2/subjects?ids=...` for the matched subject IDs
 
-in your browser.
-
-
----
-
-# Usage
-
-1. Paste your **WaniKani API token**
-2. Click **Sync Master+ Vocabulary**
-3. The app will:
-   - fetch your assignments
-   - identify vocabulary at **SRS stages 7–9**
-   - download the corresponding subjects
-   - extract their example sentences
-
-You can then:
-
-- search by word or sentence
-- play Japanese audio
-- reveal the English translation
-- browse by level
+From those subjects, it reads context sentence fields (`context_sentences`) and renders Japanese/English sentence pairs.
 
 ---
 
-# How It Works
+## Known limitations
 
-The WaniKani API separates **user progress** from **subject data**, so the tool performs two steps.
-
-### 1. Fetch assignments
-
-
-/v2/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9
-
-
-This identifies vocabulary currently at **Master or above**.
-
-### 2. Fetch subjects
-
-
-/v2/subjects?ids=...
-
-
-From these subjects the tool extracts:
-
-
-context_sentences
-
-
-Each sentence includes:
-
-- Japanese
-- English translation
-
-The app merges the assignment data and subject data into a local sentence library.
+- **Rate limits:** WaniKani API rate limiting (`429`) can delay sync; the app retries a few times, then surfaces an error.
+- **Token/auth errors:** Invalid/revoked/missing token causes unauthorized/forbidden failures and sync will not proceed.
+- **Browser storage scope:** Data is tied to the current browser/profile/device and can be lost if local site storage is cleared.
+- **Subject coverage:** Only items with available `context_sentences` appear in the final sentence list.
 
 ---
 
-# Privacy
+## v1 Definition of Done
 
-Your API token is stored **only in your browser's local storage**.
+Implemented v1 scope checklist:
 
-No external server is involved.  
-All API calls go **directly from your browser to WaniKani**.
+- [x] Manual token entry and local token persistence in browser storage
+- [x] Manual “Sync now / Refresh” flow
+- [x] Fetch Master+ (`srs_stages=7,8,9`) assignments for vocabulary + kana vocabulary
+- [x] Fetch matching subjects by ID
+- [x] Build local sentence library from `context_sentences`
+- [x] Render searchable/browsable sentence list with JA/EN context lines
+- [x] Basic sync status and error feedback in UI
+- [x] No backend required (fully local static app)
 
----
+Deferred to future iterations (explicitly **out of v1 scope**):
 
-# Limitations
-
-- Only vocabulary with example sentences will appear
-- Japanese audio uses **browser speech synthesis**, so voice quality depends on your system
-- The tool shows items **currently at Master+**, not items that reached Master in the past but later dropped
-
----
-
-# Future Ideas
-
-Possible improvements:
-
-- sentence shadowing mode
-- random listening drills
-- export to Anki deck
-- audio caching
-- frequency analysis of known vocabulary
-- sentence difficulty filtering
+- [ ] TTS playback
+- [ ] Export (CSV/JSON/Anki/etc.)
+- [ ] Automatic background sync / scheduled sync
 
 ---
 
-# Disclaimer
+## Notes
 
-This project is not affiliated with or endorsed by WaniKani.
-
-WaniKani is a product of Tofugu LLC.
+This project is not affiliated with or endorsed by WaniKani / Tofugu.
