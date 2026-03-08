@@ -27,7 +27,7 @@ export function renderTokenSync(authState) {
       />
       <div>
         <button id="save-token-button" type="submit">Save token</button>
-        <button id="sync-button" type="button">Sync Master+ Vocabulary</button>
+        <button id="sync-button" type="button">Sync now / Refresh</button>
       </div>
       <p>Token status: <strong>${tokenSavedLabel}</strong>.</p>
       <p>This token is stored only in your browser.</p>

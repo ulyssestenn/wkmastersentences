@@ -9,6 +9,7 @@ export const state = {
     inProgress: false,
     lastSyncedAt: null,
     lastError: null,
+    lastErrorType: null,
     stats: null,
   },
   library: {

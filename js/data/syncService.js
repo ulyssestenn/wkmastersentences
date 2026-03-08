@@ -74,6 +74,7 @@ export async function syncAssignments({ token }) {
   setSyncStatus({
     inProgress: true,
     lastError: null,
+    lastErrorType: null,
   });
 
   try {
@@ -98,6 +99,8 @@ export async function syncAssignments({ token }) {
     setSyncStatus({
       inProgress: false,
       lastSyncedAt: snapshot.lastSyncedAt,
+      lastError: null,
+      lastErrorType: null,
       stats: {
         assignments: assignments.length,
         subjectIds: subjectIds.length,
@@ -110,6 +113,7 @@ export async function syncAssignments({ token }) {
     setSyncStatus({
       inProgress: false,
       lastError: error?.message ?? 'Failed to sync assignments.',
+      lastErrorType: error?.type ?? 'unknown',
     });
 
     throw error;
