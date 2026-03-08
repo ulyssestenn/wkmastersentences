@@ -37,6 +37,10 @@ function classifyError(syncState) {
     return 'Network error: check your connection, then retry sync.';
   }
 
+  if (type === 'startup_error') {
+    return syncState.lastError ? `Startup error: ${syncState.lastError}` : 'Startup error: Unable to initialize the app.';
+  }
+
   return syncState.lastError ? `Sync error: ${syncState.lastError}` : null;
 }
 
