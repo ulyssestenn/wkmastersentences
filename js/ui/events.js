@@ -1,6 +1,6 @@
 import { saveToken } from '../data/storage.js';
 import { syncAssignments } from '../data/syncService.js';
-import { setAuth, setSyncStatus } from '../state.js';
+import { setAuth, setSyncStatus, setUi } from '../state.js';
 
 function getTokenValue() {
   const tokenInput = document.querySelector('#api-token-input');
@@ -40,10 +40,29 @@ async function onTokenSyncAttempt() {
   }
 }
 
-export function bindEvents() {
+function onQueryChange(event, state) {
+  setUi({
+    ...state.ui,
+    query: event.target.value,
+  });
+}
+
+function onSubjectTypeChange(event, state) {
+  setUi({
+    ...state.ui,
+    filters: {
+      ...state.ui.filters,
+      subjectType: event.target.value,
+    },
+  });
+}
+
+export function bindEvents(state) {
   const tokenForm = document.querySelector('#token-form');
   const saveTokenButton = document.querySelector('#save-token-button');
   const syncButton = document.querySelector('#sync-button');
+  const textSearchInput = document.querySelector('#text-search-input');
+  const subjectTypeFilter = document.querySelector('#subject-type-filter');
 
   if (tokenForm && !tokenForm.dataset.bound) {
     tokenForm.addEventListener('submit', async (event) => {
@@ -65,5 +84,19 @@ export function bindEvents() {
       await onTokenSyncAttempt();
     });
     syncButton.dataset.bound = 'true';
+  }
+
+  if (textSearchInput && !textSearchInput.dataset.bound) {
+    textSearchInput.addEventListener('input', (event) => {
+      onQueryChange(event, state);
+    });
+    textSearchInput.dataset.bound = 'true';
+  }
+
+  if (subjectTypeFilter && !subjectTypeFilter.dataset.bound) {
+    subjectTypeFilter.addEventListener('change', (event) => {
+      onSubjectTypeChange(event, state);
+    });
+    subjectTypeFilter.dataset.bound = 'true';
   }
 }
