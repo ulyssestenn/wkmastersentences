@@ -1,11 +1,4 @@
-function escapeHtml(value) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
+import { escapeHtml } from '../utils/sanitize.js';
 
 export function renderTokenSync(authState) {
   const container = document.querySelector('#token-sync-content');

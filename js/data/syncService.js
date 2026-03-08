@@ -1,8 +1,9 @@
 import { fetchAllPages } from '../api/pagination.js';
 import { createWanikaniClient } from '../api/wanikaniClient.js';
+import { mergeSentenceLibraries } from './mergeLibrary.js';
 import { normalizeAssignmentRecord, normalizeSubjectRecord } from './normalizers.js';
 import { saveCurrentSnapshot } from './storage.js';
-import { setSyncStatus } from '../state.js';
+import { setLibrary, setSyncStatus } from '../state.js';
 import { chunk } from '../utils/chunk.js';
 
 const ASSIGNMENTS_ENDPOINT =
@@ -87,24 +88,30 @@ export async function syncAssignments({ token }) {
 
     const subjects = subjectIds.length ? await fetchSubjectsInChunks(client, subjectIds) : [];
 
+    const lastSyncedAt = new Date().toISOString();
+    const merged = mergeSentenceLibraries(assignments, subjects, lastSyncedAt);
+
     const snapshot = {
       assignments,
       subjects,
       subjectIds,
-      lastSyncedAt: new Date().toISOString(),
+      lastSyncedAt,
     };
 
     await saveCurrentSnapshot(snapshot);
 
+    setLibrary({ items: merged.items });
+
     setSyncStatus({
       inProgress: false,
-      lastSyncedAt: snapshot.lastSyncedAt,
+      lastSyncedAt,
       lastError: null,
       lastErrorType: null,
       stats: {
         assignments: assignments.length,
         subjectIds: subjectIds.length,
         subjects: subjects.length,
+        sentenceItems: merged.stats.keptWithSentences,
       },
     });
 
