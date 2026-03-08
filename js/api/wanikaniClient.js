@@ -99,7 +99,7 @@ export function createWanikaniClient({ token, fetchFn = fetch, baseUrl = DEFAULT
       }
 
       const subjectIds = ids.join(',');
-      return request(`${DEFAULT_API_BASE_URL}/subjects?ids=${subjectIds}`);
+      return request(`${baseUrl}/subjects?ids=${subjectIds}`);
     },
   };
 }

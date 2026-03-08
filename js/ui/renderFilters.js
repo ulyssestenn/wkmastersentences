@@ -1,15 +1,8 @@
+import { escapeHtml } from '../utils/sanitize.js';
+
 function getSubjectTypeValue(uiState) {
   const subjectType = uiState?.filters?.subjectType;
   return subjectType === 'vocabulary' || subjectType === 'kana_vocabulary' ? subjectType : 'all';
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 export function renderFilters(uiState) {
