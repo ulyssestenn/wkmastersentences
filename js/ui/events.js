@@ -11,6 +11,20 @@ function getTokenValue() {
   return tokenInput.value.trim();
 }
 
+function setControlsDisabled(disabled) {
+  const controls = [
+    document.querySelector('#save-token-button'),
+    document.querySelector('#sync-button'),
+    document.querySelector('#text-search-input'),
+    document.querySelector('#subject-type-filter'),
+    document.querySelector('#api-token-input'),
+  ].filter(Boolean);
+
+  controls.forEach((control) => {
+    control.disabled = disabled;
+  });
+}
+
 async function persistTokenFromInput() {
   const token = getTokenValue();
 
@@ -29,14 +43,19 @@ async function onTokenSyncAttempt() {
   if (!token) {
     setSyncStatus({
       lastError: 'Token missing or invalid. Enter your token and save before syncing.',
+      lastErrorType: 'unauthorized',
     });
     return;
   }
+
+  setControlsDisabled(true);
 
   try {
     await syncAssignments({ token });
   } catch {
     // Sync service already updates sync status with a normalized error.
+  } finally {
+    setControlsDisabled(false);
   }
 }
 
@@ -98,5 +117,11 @@ export function bindEvents(state) {
       onSubjectTypeChange(event, state);
     });
     subjectTypeFilter.dataset.bound = 'true';
+  }
+
+  setControlsDisabled(Boolean(state.sync?.inProgress));
+
+  if (syncButton) {
+    syncButton.textContent = state.sync?.inProgress ? 'Refreshing…' : 'Sync now / Refresh';
   }
 }
