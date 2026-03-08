@@ -1,10 +1,72 @@
 import { fetchAllPages } from '../api/pagination.js';
 import { createWanikaniClient } from '../api/wanikaniClient.js';
-import { normalizeAssignmentRecord } from './normalizers.js';
+import { normalizeAssignmentRecord, normalizeSubjectRecord } from './normalizers.js';
+import { saveCurrentSnapshot } from './storage.js';
 import { setSyncStatus } from '../state.js';
+import { chunk } from '../utils/chunk.js';
 
 const ASSIGNMENTS_ENDPOINT =
   '/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9';
+const SUBJECT_CHUNK_SIZE = 100;
+const RETRY_ATTEMPTS = 3;
+const RETRYABLE_ERROR_TYPES = new Set(['network_error', 'rate_limited', 'server_error']);
+
+function wait(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function getRetryDelayMs(error, attempt) {
+  const retryAfterHeaderSeconds = Number(error?.retryAfter);
+  if (Number.isFinite(retryAfterHeaderSeconds) && retryAfterHeaderSeconds > 0) {
+    return retryAfterHeaderSeconds * 1000;
+  }
+
+  return 500 * attempt;
+}
+
+async function withRetry(requestFn) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      lastError = error;
+      const shouldRetry = RETRYABLE_ERROR_TYPES.has(error?.type) && attempt < RETRY_ATTEMPTS;
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      await wait(getRetryDelayMs(error, attempt));
+    }
+  }
+
+  throw lastError;
+}
+
+async function fetchSubjectsInChunks(client, subjectIds) {
+  const idChunks = chunk(subjectIds, SUBJECT_CHUNK_SIZE);
+  const subjects = [];
+
+  for (let index = 0; index < idChunks.length; index += 1) {
+    const chunkedIds = idChunks[index];
+
+    try {
+      const response = await withRetry(() => client.fetchSubjects(chunkedIds));
+      const records = response?.data ?? [];
+      subjects.push(...records.map(normalizeSubjectRecord));
+    } catch (error) {
+      throw {
+        ...error,
+        message: `Failed to fetch subjects chunk ${index + 1}/${idChunks.length} after retries.`,
+      };
+    }
+  }
+
+  return subjects;
+}
 
 export async function syncAssignments({ token }) {
   const client = createWanikaniClient({ token });
@@ -22,35 +84,28 @@ export async function syncAssignments({ token }) {
       new Set(assignments.map((assignment) => assignment.subject_id).filter((subjectId) => Number.isFinite(subjectId))),
     );
 
-    if (!subjectIds.length) {
-      setSyncStatus({
-        inProgress: false,
-        lastSyncedAt: new Date().toISOString(),
-        stats: {
-          assignments: assignments.length,
-          subjectIds: 0,
-        },
-      });
+    const subjects = subjectIds.length ? await fetchSubjectsInChunks(client, subjectIds) : [];
 
-      return {
-        assignments,
-        subjectIds: [],
-      };
-    }
+    const snapshot = {
+      assignments,
+      subjects,
+      subjectIds,
+      lastSyncedAt: new Date().toISOString(),
+    };
+
+    await saveCurrentSnapshot(snapshot);
 
     setSyncStatus({
       inProgress: false,
-      lastSyncedAt: new Date().toISOString(),
+      lastSyncedAt: snapshot.lastSyncedAt,
       stats: {
         assignments: assignments.length,
         subjectIds: subjectIds.length,
+        subjects: subjects.length,
       },
     });
 
-    return {
-      assignments,
-      subjectIds,
-    };
+    return snapshot;
   } catch (error) {
     setSyncStatus({
       inProgress: false,
