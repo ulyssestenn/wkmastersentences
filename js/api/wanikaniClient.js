@@ -1,4 +1,5 @@
 const DEFAULT_API_BASE_URL = 'https://api.wanikani.com/v2';
+const REQUEST_TIMEOUT_MS = 12_000;
 
 function normalizeApiError(status, payload, response) {
   const apiMessage = payload?.error ?? payload?.message ?? `Request failed with status ${status}`;
@@ -58,17 +59,33 @@ export function createWanikaniClient({ token, fetchFn = fetch, baseUrl = DEFAULT
     const endpointUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
     let response;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+
     try {
       response = await fetchFn(endpointUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: controller.signal,
       });
     } catch (error) {
+      const isTimeout = error?.name === 'AbortError' || controller.signal.aborted;
+      if (isTimeout) {
+        throw {
+          type: 'timeout_error',
+          message: `Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s.`,
+        };
+      }
+
       throw {
         type: 'network_error',
         message: error?.message ?? 'Network request failed.',
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     const payload = await parseResponseBody(response);

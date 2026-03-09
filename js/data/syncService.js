@@ -10,7 +10,7 @@ const ASSIGNMENTS_ENDPOINT =
   '/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9';
 const SUBJECT_CHUNK_SIZE = 100;
 const RETRY_ATTEMPTS = 3;
-const RETRYABLE_ERROR_TYPES = new Set(['network_error', 'rate_limited', 'server_error']);
+const RETRYABLE_ERROR_TYPES = new Set(['network_error', 'timeout_error', 'rate_limited', 'server_error']);
 
 function wait(milliseconds) {
   return new Promise((resolve) => {
