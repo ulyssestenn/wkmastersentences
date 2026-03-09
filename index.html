@@ -36,57 +36,5 @@
     </main>
 
     <script src="js/app.bundle.js"></script>
-    <script>
-      (() => {
-        const appRoot = document.getElementById("app-root");
-        const statusContent = document.getElementById("status-content");
-
-        const showBootstrapWarning = (message) => {
-          const container = statusContent ?? appRoot;
-          if (!container) {
-            return;
-          }
-
-          const existingWarning = container.querySelector('[data-bootstrap-warning="true"]');
-          if (existingWarning) {
-            return;
-          }
-
-          const warning = document.createElement("p");
-          warning.setAttribute("data-bootstrap-warning", "true");
-          warning.style.cssText =
-            "margin:0 0 1rem;padding:0.75rem 1rem;border:1px solid #b45309;background:#fffbeb;color:#78350f;font-weight:600;";
-          warning.textContent = message;
-          container.prepend(warning);
-        };
-
-        if (location.protocol === "file:") {
-          showBootstrapWarning(
-            "This app should be served over http://localhost (not opened directly as a file)."
-          );
-        }
-
-        window.addEventListener(
-          "error",
-          (event) => {
-            const target = event.target;
-            if (!(target instanceof HTMLScriptElement)) {
-              return;
-            }
-
-            const scriptUrl = new URL(target.src, location.href);
-            if (!scriptUrl.pathname.endsWith("/js/app.js")) {
-              return;
-            }
-
-            showBootstrapWarning(
-              "Unable to load js/app.js. Please run this app from http://localhost and verify the JavaScript files are accessible."
-            );
-          },
-          true
-        );
-      })();
-    </script>
-    <script type="module" src="js/app.js"></script>
   </body>
 </html>
