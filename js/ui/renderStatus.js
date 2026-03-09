@@ -48,32 +48,33 @@ export function renderStatus(syncState, authState) {
   const container = document.querySelector('#status-content');
   if (!container) return;
 
-  const lines = [];
+  const blocks = [];
+  container.className = 'ui-stack status-stack';
   const tokenStatus = authState?.tokenSaved ? 'Token saved locally.' : 'Token not saved yet.';
-  lines.push(tokenStatus);
+  blocks.push(`<p class="ui-state ${authState?.tokenSaved ? 'ui-state--info' : 'ui-state--error'}">${tokenStatus}</p>`);
 
   if (syncState.inProgress) {
-    lines.push('Sync in progress…');
+    blocks.push('<p class="ui-state ui-state--info">Sync in progress…</p>');
   }
 
   const lastSynced = formatTimestamp(syncState.lastSyncedAt);
   if (lastSynced) {
-    lines.push(`Last synced: ${lastSynced}`);
+    blocks.push(`<p class="ui-state ui-state--info">Last synced: ${lastSynced}</p>`);
   }
 
   const statsSummary = renderStatsSummary(syncState.stats);
   if (statsSummary) {
-    lines.push(statsSummary);
+    blocks.push(`<p class="ui-state ui-state--info">${statsSummary}</p>`);
   }
 
   const actionableError = classifyError(syncState);
   if (actionableError) {
-    lines.push(actionableError);
+    blocks.push(`<p class="ui-state ui-state--error">${actionableError}</p>`);
   }
 
   if (!syncState.inProgress && !syncState.lastSyncedAt && !syncState.lastError) {
-    lines.push('Ready');
+    blocks.push('<p class="ui-state ui-state--empty">Ready</p>');
   }
 
-  container.textContent = lines.join(' ');
+  container.innerHTML = blocks.join('');
 }

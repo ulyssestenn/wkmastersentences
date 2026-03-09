@@ -51,7 +51,7 @@ function formatSentenceDetails(item) {
   const sentences = Array.isArray(item?.contextSentences) ? item.contextSentences : [];
 
   if (!sentences.length) {
-    return '<li>No context sentences.</li>';
+    return '<li class="results-card__sentence-row"><p class="results-card__sentence-line">No context sentences.</p></li>';
   }
 
   return sentences
@@ -60,9 +60,9 @@ function formatSentenceDetails(item) {
       const english = escapeHtml(sentence?.en ?? sentence?.english ?? '');
 
       return `
-        <li>
-          <p><strong>JA:</strong> ${japanese || '—'}</p>
-          <p><strong>EN:</strong> ${english || '—'}</p>
+        <li class="results-card__sentence-row">
+          <p class="results-card__sentence-line"><strong>JA:</strong> ${japanese || '—'}</p>
+          <p class="results-card__sentence-line"><strong>EN:</strong> ${english || '—'}</p>
         </li>
       `;
     })
@@ -77,37 +77,46 @@ export function renderList(libraryState, uiState) {
   const normalizedQuery = (uiState?.query ?? '').trim().toLowerCase();
   const subjectType = getSubjectType(uiState);
 
+  if (!items.length) {
+    container.innerHTML = '<p class="ui-state ui-state--info">No synced data yet. Add a token and run sync to load results.</p>';
+    return;
+  }
+
   const filteredItems = items.filter(
     (item) => matchesSubjectType(item, subjectType) && matchesQuery(item, normalizedQuery),
   );
 
   if (!filteredItems.length) {
-    container.innerHTML = '<p>No matching items.</p>';
+    container.innerHTML = '<p class="ui-state ui-state--empty">No matching items.</p>';
     return;
   }
 
-  container.innerHTML = filteredItems
-    .map((item) => {
-      const meanings = getMeaningStrings(item);
-      const meaningsPreview = meanings.slice(0, 3).join(', ');
-      const hiddenMeanings = meanings.length > 3 ? ` (+${meanings.length - 3} more)` : '';
-      const sentenceCount = Array.isArray(item?.contextSentences) ? item.contextSentences.length : 0;
+  container.innerHTML = `
+    <div class="results-list">
+      ${filteredItems
+        .map((item) => {
+          const meanings = getMeaningStrings(item);
+          const meaningsPreview = meanings.slice(0, 3).join(', ');
+          const hiddenMeanings = meanings.length > 3 ? ` (+${meanings.length - 3} more)` : '';
+          const sentenceCount = Array.isArray(item?.contextSentences) ? item.contextSentences.length : 0;
 
-      return `
-        <article>
-          <h3>${escapeHtml(item?.characters || item?.slug || 'Untitled')}</h3>
-          <p><strong>Slug:</strong> ${escapeHtml(item?.slug || '—')}</p>
-          <p><strong>Level:</strong> ${escapeHtml(item?.level ?? '—')}</p>
-          <p><strong>Meanings:</strong> ${escapeHtml(meaningsPreview || '—')}${escapeHtml(hiddenMeanings)}</p>
-          <p><strong>Sentence count:</strong> ${sentenceCount}</p>
-          <details>
-            <summary>View context sentences</summary>
-            <ul>
-              ${formatSentenceDetails(item)}
-            </ul>
-          </details>
-        </article>
-      `;
-    })
-    .join('');
+          return `
+            <article class="results-card">
+              <h3 class="results-card__title">${escapeHtml(item?.characters || item?.slug || 'Untitled')}</h3>
+              <p class="results-card__meta"><strong>Slug:</strong> ${escapeHtml(item?.slug || '—')}</p>
+              <p class="results-card__meta"><strong>Level:</strong> ${escapeHtml(item?.level ?? '—')}</p>
+              <p class="results-card__meta"><strong>Meanings:</strong> ${escapeHtml(meaningsPreview || '—')}${escapeHtml(hiddenMeanings)}</p>
+              <p class="results-card__meta"><strong>Sentence count:</strong> ${sentenceCount}</p>
+              <details class="results-card__details">
+                <summary class="results-card__summary">View context sentences</summary>
+                <ul class="results-card__sentences">
+                  ${formatSentenceDetails(item)}
+                </ul>
+              </details>
+            </article>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
 }
