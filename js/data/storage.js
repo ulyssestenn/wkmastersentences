@@ -52,8 +52,23 @@ export function openDatabase() {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+
+      db.onclose = () => {
+        dbPromise = undefined;
+      };
+
+      db.onversionchange = () => {
+        dbPromise = undefined;
+      };
+
+      resolve(db);
+    };
     request.onerror = () => reject(request.error || new Error('Failed to open IndexedDB database.'));
+  }).catch((error) => {
+    dbPromise = undefined;
+    throw error;
   });
 
   return dbPromise;
