@@ -18,13 +18,13 @@ A small, browser-only app for building a local library of **WaniKani Master+ voc
 
 ### Option 1: Open file directly (quickest)
 
-Open `index.html` in your browser.
+Open `index.html` in your browser. This repository includes a pre-bundled browser script (`js/app.bundle.js`) so direct file opening works without running a local server.
 
 - macOS: `open index.html`
 - Linux: `xdg-open index.html`
 - Windows (PowerShell): `start index.html`
 
-### Option 2 (recommended): Serve as local static files
+### Option 2: Serve as local static files
 
 From the repository root:
 
@@ -40,6 +40,16 @@ Alternative (Node):
 
 ```bash
 npx serve .
+```
+
+---
+
+## Rebuilding the browser bundle
+
+If you change files under `js/`, rebuild `js/app.bundle.js` before distributing:
+
+```bash
+npx esbuild js/app.js --bundle --format=iife --platform=browser --outfile=js/app.bundle.js
 ```
 
 ---
