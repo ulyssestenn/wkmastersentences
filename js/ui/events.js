@@ -59,10 +59,10 @@ async function onTokenSyncAttempt() {
   }
 }
 
-function onQueryChange(event, state) {
+function onQueryChange(query, state) {
   setUi({
     ...state.ui,
-    query: event.target.value,
+    query,
   });
 }
 
@@ -82,6 +82,7 @@ export function bindEvents(state) {
   const syncButton = document.querySelector('#sync-button');
   const textSearchInput = document.querySelector('#text-search-input');
   const subjectTypeFilter = document.querySelector('#subject-type-filter');
+  let queryDebounceTimer;
 
   if (tokenForm && !tokenForm.dataset.bound) {
     tokenForm.addEventListener('submit', async (event) => {
@@ -107,7 +108,11 @@ export function bindEvents(state) {
 
   if (textSearchInput && !textSearchInput.dataset.bound) {
     textSearchInput.addEventListener('input', (event) => {
-      onQueryChange(event, state);
+      const queryInput = event.target;
+      clearTimeout(queryDebounceTimer);
+      queryDebounceTimer = setTimeout(() => {
+        onQueryChange(queryInput.value, state);
+      }, 250);
     });
     textSearchInput.dataset.bound = 'true';
   }
