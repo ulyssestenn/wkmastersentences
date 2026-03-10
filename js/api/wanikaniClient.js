@@ -68,6 +68,7 @@ export function createWanikaniClient({ token, fetchFn = fetch, baseUrl = DEFAULT
       response = await fetchFn(endpointUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Wanikani-Revision': '20170710',
         },
         signal: controller.signal,
       });
