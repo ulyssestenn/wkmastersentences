@@ -68,10 +68,14 @@ Your WaniKani API token is stored **browser-local only** (IndexedDB in this app)
 
 The app fetches only what it needs for Master+ sentence browsing:
 
-1. `GET /v2/assignments?subject_types=vocabulary,kana_vocabulary`
-2. `GET /v2/subjects?ids=...` for the matched subject IDs
+1. `GET /v2/assignments?srs_stages=7,8,9&subject_types=vocabulary,kana_vocabulary`
+2. `GET /v2/subjects?ids=...`
 
-It then filters assignments locally to SRS stages `7,8,9` before fetching subjects.
+Exact method and responsibility split:
+
+- `assignments` is used for filtering (SRS stages + subject types) and for collecting the `subject_id` values.
+- `subjects` is used to fetch each matched subject record and read `context_sentences`.
+- Both endpoints are required: `assignments` alone does not include `context_sentences`, and `subjects` alone cannot apply the user-assignment/SRS filtering.
 
 From those subjects, it reads context sentence fields (`context_sentences`) and renders Japanese/English sentence pairs.
 
