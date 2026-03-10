@@ -68,7 +68,6 @@ export function createWanikaniClient({ token, fetchFn = fetch, baseUrl = DEFAULT
       response = await fetchFn(endpointUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Wanikani-Revision': '20170710',
         },
         signal: controller.signal,
       });
@@ -102,7 +101,7 @@ export function createWanikaniClient({ token, fetchFn = fetch, baseUrl = DEFAULT
 
     async fetchAssignments() {
       return request(
-        '/assignments?subject_types=vocabulary,kana_vocabulary',
+        '/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9',
       );
     },
 
