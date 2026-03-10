@@ -75,6 +75,28 @@ It then filters assignments locally to SRS stages `7,8,9` before fetching subjec
 
 From those subjects, it reads context sentence fields (`context_sentences`) and renders Japanese/English sentence pairs.
 
+
+### API request header examples
+
+WaniKani API requests should include both the bearer token and revision header:
+
+```http
+Authorization: Bearer <YOUR_API_TOKEN>
+Wanikani-Revision: 20170710
+```
+
+Example endpoints used by this app:
+
+```bash
+curl -H "Authorization: Bearer <YOUR_API_TOKEN>" \
+  -H "Wanikani-Revision: 20170710" \
+  "https://api.wanikani.com/v2/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9"
+
+curl -H "Authorization: Bearer <YOUR_API_TOKEN>" \
+  -H "Wanikani-Revision: 20170710" \
+  "https://api.wanikani.com/v2/subjects?ids=440,1234"
+```
+
 ---
 
 ## Known limitations
