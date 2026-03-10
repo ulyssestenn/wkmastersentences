@@ -463,7 +463,8 @@
       try {
         response = await fetchFn(endpointUrl, {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            "Wanikani-Revision": "20170710"
           },
           signal: controller.signal
         });
@@ -605,7 +606,9 @@
       const assignmentRecords = await fetchAllPages(ASSIGNMENTS_ENDPOINT, (url) => client.request(url));
       const assignments = assignmentRecords.map(normalizeAssignmentRecord).filter((assignment) => INCLUDED_SRS_STAGES.has(Number(assignment?.srs_stage)));
       const subjectIds = Array.from(
-        new Set(assignments.map((assignment) => assignment.subject_id).filter((subjectId) => Number.isFinite(subjectId)))
+        new Set(
+          assignments.map((assignment) => Number(assignment?.subject_id)).filter((subjectId) => Number.isFinite(subjectId))
+        )
       );
       const subjects = subjectIds.length ? await fetchSubjectsInChunks(client, subjectIds) : [];
       const lastSyncedAt = (/* @__PURE__ */ new Date()).toISOString();
