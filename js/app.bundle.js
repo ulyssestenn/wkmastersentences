@@ -492,7 +492,7 @@
       request,
       async fetchAssignments() {
         return request(
-          "/assignments?subject_types=vocabulary,kana_vocabulary"
+          "/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9"
         );
       },
       async fetchSubjects(ids = []) {
@@ -543,7 +543,7 @@
   }
 
   // js/data/syncService.js
-  var ASSIGNMENTS_ENDPOINT = "/assignments?subject_types=vocabulary,kana_vocabulary";
+  var ASSIGNMENTS_ENDPOINT = "/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9";
   var INCLUDED_SRS_STAGES = /* @__PURE__ */ new Set([7, 8, 9]);
   var SUBJECT_CHUNK_SIZE = 100;
   var RETRY_ATTEMPTS = 3;
