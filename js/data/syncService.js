@@ -7,7 +7,7 @@ import { setLibrary, setSyncStatus } from '../state.js';
 import { chunk } from '../utils/chunk.js';
 
 const ASSIGNMENTS_ENDPOINT =
-  '/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9';
+  '/assignments?subject_types=vocabulary,kana_vocabulary';
 const SUBJECT_CHUNK_SIZE = 100;
 const RETRY_ATTEMPTS = 3;
 const RETRYABLE_ERROR_TYPES = new Set(['network_error', 'timeout_error', 'rate_limited', 'server_error']);
