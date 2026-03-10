@@ -6,8 +6,8 @@ import { saveCurrentSnapshot } from './storage.js';
 import { setLibrary, setSyncStatus } from '../state.js';
 import { chunk } from '../utils/chunk.js';
 
-const ASSIGNMENTS_ENDPOINT =
-  '/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9';
+const ASSIGNMENTS_ENDPOINT = '/assignments?subject_types=vocabulary,kana_vocabulary';
+const INCLUDED_SRS_STAGES = new Set([7, 8, 9]);
 const SUBJECT_CHUNK_SIZE = 100;
 const RETRY_ATTEMPTS = 3;
 const RETRYABLE_ERROR_TYPES = new Set(['network_error', 'timeout_error', 'rate_limited', 'server_error']);
@@ -80,7 +80,9 @@ export async function syncAssignments({ token }) {
 
   try {
     const assignmentRecords = await fetchAllPages(ASSIGNMENTS_ENDPOINT, (url) => client.request(url));
-    const assignments = assignmentRecords.map(normalizeAssignmentRecord);
+    const assignments = assignmentRecords
+      .map(normalizeAssignmentRecord)
+      .filter((assignment) => INCLUDED_SRS_STAGES.has(Number(assignment?.srs_stage)));
 
     const subjectIds = Array.from(
       new Set(assignments.map((assignment) => assignment.subject_id).filter((subjectId) => Number.isFinite(subjectId))),

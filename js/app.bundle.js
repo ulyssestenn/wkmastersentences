@@ -492,7 +492,7 @@
       request,
       async fetchAssignments() {
         return request(
-          "/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9"
+          "/assignments?subject_types=vocabulary,kana_vocabulary"
         );
       },
       async fetchSubjects(ids = []) {
@@ -543,7 +543,8 @@
   }
 
   // js/data/syncService.js
-  var ASSIGNMENTS_ENDPOINT = "/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9";
+  var ASSIGNMENTS_ENDPOINT = "/assignments?subject_types=vocabulary,kana_vocabulary";
+  var INCLUDED_SRS_STAGES = /* @__PURE__ */ new Set([7, 8, 9]);
   var SUBJECT_CHUNK_SIZE = 100;
   var RETRY_ATTEMPTS = 3;
   var RETRYABLE_ERROR_TYPES = /* @__PURE__ */ new Set(["network_error", "timeout_error", "rate_limited", "server_error"]);
@@ -602,7 +603,7 @@
     });
     try {
       const assignmentRecords = await fetchAllPages(ASSIGNMENTS_ENDPOINT, (url) => client.request(url));
-      const assignments = assignmentRecords.map(normalizeAssignmentRecord);
+      const assignments = assignmentRecords.map(normalizeAssignmentRecord).filter((assignment) => INCLUDED_SRS_STAGES.has(Number(assignment?.srs_stage)));
       const subjectIds = Array.from(
         new Set(assignments.map((assignment) => assignment.subject_id).filter((subjectId) => Number.isFinite(subjectId)))
       );

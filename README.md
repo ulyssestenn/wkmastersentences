@@ -7,7 +7,7 @@ A small, browser-only app for building a local library of **WaniKani Master+ voc
 - Fetches your WaniKani assignments for:
   - `vocabulary`
   - `kana_vocabulary`
-- Filters to SRS stages **7, 8, 9** (Master, Enlightened, Burned).
+- Filters to SRS stages **7, 8, 9** (Master, Enlightened, Burned) after fetching assignments.
 - Fetches matching subject records.
 - Extracts and displays `context_sentences` (Japanese + English).
 - Stores token + synced library data in your browser so you can reopen later.
@@ -68,8 +68,10 @@ Your WaniKani API token is stored **browser-local only** (IndexedDB in this app)
 
 The app fetches only what it needs for Master+ sentence browsing:
 
-1. `GET /v2/assignments?subject_types=vocabulary,kana_vocabulary&srs_stages=7,8,9`
+1. `GET /v2/assignments?subject_types=vocabulary,kana_vocabulary`
 2. `GET /v2/subjects?ids=...` for the matched subject IDs
+
+It then filters assignments locally to SRS stages `7,8,9` before fetching subjects.
 
 From those subjects, it reads context sentence fields (`context_sentences`) and renders Japanese/English sentence pairs.
 
@@ -90,7 +92,7 @@ Implemented v1 scope checklist:
 
 - [x] Manual token entry and local token persistence in browser storage
 - [x] Manual “Sync now / Refresh” flow
-- [x] Fetch Master+ (`srs_stages=7,8,9`) assignments for vocabulary + kana vocabulary
+- [x] Fetch vocabulary + kana vocabulary assignments, then keep Master+ (`srs_stages=7,8,9`) locally
 - [x] Fetch matching subjects by ID
 - [x] Build local sentence library from `context_sentences`
 - [x] Render searchable/browsable sentence list with JA/EN context lines
