@@ -28,23 +28,14 @@ A CSV file like this:
 
 ## Why This Is Useful
 
-- Build your own **sentence-based study decks**
-- Feed into **LLMs for immersion tools**
-- Create **custom readers or apps**
-- Analyze your learned vocabulary programmatically
+- Add sentences to Anki decks
+- Create practice audio files with text-to-speech
 
 ---
 
 ## Requirements
 
 - Python 3.9+
-- `requests` library
-
-Install dependency:
-
-```bash
-pip install requests
-```
 
 ## Setup
 
@@ -61,18 +52,18 @@ Create a token with read permissions.
 Open the script and replace:
 
 ```python
-API_TOKEN = "YOUR_TOKEN_HERE"
+API_TOKEN = "PASTE_YOUR_TOKEN_HERE"
 ```
 
-### 3) Run the script
+### 3) Run the program
 
-```bash
-python your_script_name.py
+```text
+import_time.py
 ```
 
 ## Output
 
-The script will generate:
+The program will generate:
 
 ```text
 wanikani_mastered_vocab_sentences.csv
