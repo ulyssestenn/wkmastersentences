@@ -44,8 +44,11 @@ Install dependency:
 
 ```bash
 pip install requests
-Setup
-1. Get your API token
+```
+
+## Setup
+
+### 1) Get your API token
 
 Go to:
 
@@ -53,50 +56,72 @@ Go to:
 
 Create a token with read permissions.
 
-2. Add your token to the script
+### 2) Add your token to the script
 
 Open the script and replace:
 
+```python
 API_TOKEN = "YOUR_TOKEN_HERE"
-3. Run the script
+```
+
+### 3) Run the script
+
+```bash
 python your_script_name.py
-Output
+```
+
+## Output
 
 The script will generate:
 
+```text
 wanikani_mastered_vocab_sentences.csv
+```
 
 By default, it saves to the same folder as the script.
 
 You can change this by editing:
 
+```python
 OUTPUT_FILE = "wanikani_mastered_vocab_sentences.csv"
+```
 
 Example:
 
+```python
 OUTPUT_FILE = r"C:\Users\YourName\Desktop\wanikani.csv"
-What Counts as “Mastered”
+```
+
+## What Counts as “Mastered”
 
 This script includes vocabulary at:
 
-SRS Stage 7 — Master
-SRS Stage 8 — Enlightened
-SRS Stage 9 — Burned
+- SRS Stage 7 — Master
+- SRS Stage 8 — Enlightened
+- SRS Stage 9 — Burned
 
 If you want only strict “Master,” change:
 
+```python
 "srs_stages": "7,8,9"
+```
 
 to:
 
+```python
 "srs_stages": "7"
-How It Works (High-Level)
-Calls /assignments to find your vocabulary at SRS ≥ 7
-Extracts subject_ids
-Calls /subjects to fetch vocabulary data
-Pulls context_sentences (JA + EN)
-Writes everything to CSV
-Notes
-The API is rate-limited (60 requests/minute), but the script handles this automatically.
-Large accounts may take ~10–30 seconds to process.
-Some vocabulary items may not have example sentences.
+```
+
+## How It Works (High-Level)
+
+1. Calls `/assignments` to find your vocabulary at SRS ≥ 7
+2. Extracts `subject_ids`
+3. Calls `/subjects` to fetch vocabulary data
+4. Pulls `context_sentences` (JA + EN)
+5. Writes everything to CSV
+
+## Notes
+
+- The API is rate-limited (60 requests/minute), but the script handles this automatically.
+- Large accounts may take ~10–30 seconds to process.
+- Some vocabulary items may not have example sentences.
