@@ -37,6 +37,33 @@ def _prompt_for_value(prompt: str) -> str:
         print("Please provide a value.")
 
 
+def _prompt_yes_no(prompt: str, default_yes: bool = True) -> bool:
+    default_hint = "Y/n" if default_yes else "y/N"
+    while True:
+        raw = input(f"{prompt} [{default_hint}]: ").strip().lower()
+        if not raw:
+            return default_yes
+        if raw in {"y", "yes"}:
+            return True
+        if raw in {"n", "no"}:
+            return False
+        print("Please answer yes or no.")
+
+
+def _prompt_optional_positive_int(prompt: str) -> Optional[int]:
+    raw = input(prompt).strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        print("Invalid input; using full run.")
+        return None
+    value = int(raw)
+    if value <= 0:
+        print("Value must be greater than 0; using full run.")
+        return None
+    return value
+
+
 def _load_available_voices(tts_backend: str) -> List[Dict[str, str]]:
     if tts_backend == "edge-tts":
         try:
@@ -112,6 +139,8 @@ def _prompt_for_voice_index(
 
 def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
     """Collect required arguments interactively when they are not provided."""
+    interactive_mode = not args.input_csv or not args.ja_voice or not args.en_voice
+
     if not args.input_csv:
         if args.pick_file:
             selected = _pick_csv_file_with_dialog()
@@ -166,6 +195,14 @@ def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
         f"\n- Japanese: {args.ja_voice}"
         f"\n- English: {args.en_voice}"
     )
+
+    if interactive_mode and not args.preview_first_batch and args.num_batches is None:
+        preview_only = _prompt_yes_no("Run preview only (first batch)?", default_yes=True)
+        args.preview_first_batch = preview_only
+        if not preview_only:
+            args.num_batches = _prompt_optional_positive_int(
+                "Number of batches to generate (press Enter for full run): "
+            )
 
     return args
 
@@ -276,6 +313,16 @@ def main() -> None:
         action="store_true",
         help="Open file picker to select --input-csv when not provided",
     )
+    parser.add_argument(
+        "--preview-first-batch",
+        action="store_true",
+        help="Generate only the first batch",
+    )
+    parser.add_argument(
+        "--num-batches",
+        type=int,
+        help="Generate the first N batches",
+    )
 
     args = parser.parse_args()
     args = _resolve_required_args(args)
@@ -285,6 +332,10 @@ def main() -> None:
 
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be greater than 0")
+    if args.num_batches is not None and args.num_batches <= 0:
+        raise ValueError("--num-batches must be greater than 0")
+    if args.preview_first_batch and args.num_batches is not None:
+        raise ValueError("Use either --preview-first-batch or --num-batches, not both")
 
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -303,6 +354,19 @@ def main() -> None:
 
     valid_rows, skipped_rows = _load_sentence_pairs(input_csv)
     batches = _chunk_rows(valid_rows, args.batch_size)
+    total_possible_batches = len(batches)
+
+    run_is_partial = False
+    if args.preview_first_batch:
+        print(
+            f"\nPREVIEW MODE: generating only first batch ({args.batch_size} sentences)"
+        )
+        batches = batches[:1]
+        run_is_partial = total_possible_batches > 1
+    elif args.num_batches is not None:
+        if args.num_batches < total_possible_batches:
+            run_is_partial = True
+        batches = batches[: args.num_batches]
 
     audio_files_created = 0
     total_batches = len(batches)
@@ -326,6 +390,12 @@ def main() -> None:
     print(f"- total CSV rows read: {row_count}")
     print(f"- valid sentence pairs used: {len(valid_rows)}")
     print(f"- rows skipped: {skipped_rows}")
+    print(f"- total possible batches from CSV: {total_possible_batches}")
+    print(f"- batches actually generated: {audio_files_created}")
+    if run_is_partial:
+        print("- run type: partial")
+    else:
+        print("- run type: full")
     print(f"- number of batch audio files created: {audio_files_created}")
     print(f"- output directory path: {output_dir}")
 
