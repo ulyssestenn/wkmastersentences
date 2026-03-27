@@ -66,6 +66,16 @@ def _prompt_optional_positive_int(prompt: str) -> Optional[int]:
     return value
 
 
+def _non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("Value must be an integer.") from e
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("Value must be a non-negative integer.")
+    return parsed
+
+
 def _load_available_voices(tts_backend: str) -> List[Dict[str, str]]:
     if tts_backend == "edge-tts":
         try:
@@ -286,6 +296,13 @@ async def _generate_audio_clip(text: str, voice: str, output_path: Path) -> None
 
 
 def _generate_silence_clip(duration_ms: int, output_path: Path) -> None:
+    if duration_ms < 0:
+        raise ValueError("Silence duration must be a non-negative integer in milliseconds.")
+
+    if duration_ms == 0:
+        output_path.touch()
+        return
+
     duration_seconds = duration_ms / 1000
     cmd = [
         "ffmpeg",
@@ -347,6 +364,13 @@ def _build_batch_segment_metadata(
                     "voice": en_voice,
                     "text": row["en"],
                     "file": f"{row_base}_en.mp3",
+                },
+                {
+                    "row_num": str(row_num),
+                    "type": "silence",
+                    "slot": "ja_pause_2",
+                    "duration_ms": str(ja_pause_ms),
+                    "file": f"{row_base}_ja_pause_2.mp3",
                 },
                 {
                     "row_num": str(row_num),
@@ -412,8 +436,8 @@ def main() -> None:
     parser.add_argument("--input-csv", help="Path to CSV source file")
     parser.add_argument("--output-dir", default="audio_batches")
     parser.add_argument("--batch-size", type=int, default=30)
-    parser.add_argument("--ja-pause-ms", type=int, default=2000)
-    parser.add_argument("--post-block-pause-ms", type=int, default=2000)
+    parser.add_argument("--ja-pause-ms", type=_non_negative_int, default=2000)
+    parser.add_argument("--post-block-pause-ms", type=_non_negative_int, default=2000)
     parser.add_argument("--ja-voice", help="Voice id/name for Japanese TTS")
     parser.add_argument("--en-voice", help="Voice id/name for English TTS")
     parser.add_argument(
@@ -453,6 +477,10 @@ def main() -> None:
         raise ValueError("--batch-size must be greater than 0")
     if args.num_batches is not None and args.num_batches <= 0:
         raise ValueError("--num-batches must be greater than 0")
+    if args.ja_pause_ms < 0:
+        raise ValueError("--ja-pause-ms must be a non-negative integer")
+    if args.post_block_pause_ms < 0:
+        raise ValueError("--post-block-pause-ms must be a non-negative integer")
     if args.preview_first_batch and args.num_batches is not None:
         raise ValueError("Use either --preview-first-batch or --num-batches, not both")
 
@@ -554,7 +582,16 @@ def main() -> None:
 
                 for row_num, row in enumerate(batch_rows, start=1):
                     row_key = str(row_num)
-                    sentence_manifests.append({**row, "clip_order": clip_order_by_row[row_key]})
+                    sentence_manifests.append(
+                        {
+                            **row,
+                            "pause_durations_ms": {
+                                "ja_pause_ms": args.ja_pause_ms,
+                                "post_block_pause_ms": args.post_block_pause_ms,
+                            },
+                            "clip_order": clip_order_by_row[row_key],
+                        }
+                    )
 
                 _concatenate_audio_clips(clip_paths, batch_audio_path)
 
