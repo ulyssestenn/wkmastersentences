@@ -1,7 +1,9 @@
 import argparse
+import asyncio
 import csv
+from collections import defaultdict
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 
 def _pick_csv_file_with_dialog() -> Optional[Path]:
@@ -34,6 +36,79 @@ def _prompt_for_value(prompt: str) -> str:
         print("Please provide a value.")
 
 
+def _load_available_voices(tts_backend: str) -> List[Dict[str, str]]:
+    if tts_backend == "edge-tts":
+        try:
+            import edge_tts
+        except Exception as e:
+            raise RuntimeError(
+                "The selected TTS backend requires the 'edge-tts' package. "
+                "Install it with: pip install edge-tts"
+            ) from e
+
+        raw_voices = asyncio.run(edge_tts.list_voices())
+        voices: List[Dict[str, str]] = []
+        for voice in raw_voices:
+            short_name = voice.get("ShortName", "").strip()
+            locale = voice.get("Locale", "").strip()
+            if short_name:
+                voices.append({"name": short_name, "locale": locale})
+        return sorted(voices, key=lambda v: v["name"].lower())
+
+    raise ValueError(f"Unsupported --tts-backend: {tts_backend}")
+
+
+def _build_voice_index_sets(
+    voices: List[Dict[str, str]],
+) -> Dict[str, List[int]]:
+    locale_map: Dict[str, List[int]] = defaultdict(list)
+    for idx, voice in enumerate(voices, start=1):
+        locale = voice["locale"]
+        if locale:
+            locale_map[locale].append(idx)
+            language = locale.split("-")[0]
+            locale_map[f"{language}-*"].append(idx)
+    return dict(locale_map)
+
+
+def _print_voice_options(voices: List[Dict[str, str]]) -> None:
+    print("\nAvailable voices (full list):")
+    for idx, voice in enumerate(voices, start=1):
+        locale = voice["locale"] or "unknown"
+        print(f"{idx}) {voice['name']} [{locale}]")
+
+
+def _print_filtered_voice_options(
+    voices: List[Dict[str, str]],
+    indexes: List[int],
+    label: str,
+) -> None:
+    print(f"\n{label} voices:")
+    for idx in indexes:
+        voice = voices[idx - 1]
+        print(f"{idx}) {voice['name']} [{voice['locale'] or 'unknown'}]")
+
+
+def _prompt_for_voice_index(
+    prompt: str,
+    voices: List[Dict[str, str]],
+    allowed_indexes: List[int],
+) -> str:
+    allowed_set = set(allowed_indexes)
+    while True:
+        value = input(prompt).strip()
+        if not value.isdigit():
+            print("Please enter a number.")
+            continue
+
+        selected_index = int(value)
+        if selected_index not in allowed_set:
+            low, high = min(allowed_indexes), max(allowed_indexes)
+            print(f"Please choose a valid number from {low} to {high} in the listed group.")
+            continue
+        return voices[selected_index - 1]["name"]
+
+
 def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
     """Collect required arguments interactively when they are not provided."""
     if not args.input_csv:
@@ -47,11 +122,49 @@ def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
         if not args.input_csv:
             args.input_csv = _prompt_for_value("Path to input CSV: ")
 
+    voices = _load_available_voices(args.tts_backend)
+    if not voices:
+        raise RuntimeError("No voices were returned by the selected TTS backend.")
+
+    voice_names = {v["name"] for v in voices}
+    if args.ja_voice and args.ja_voice not in voice_names:
+        raise ValueError(f"--ja-voice not found in available voices: {args.ja_voice}")
+    if args.en_voice and args.en_voice not in voice_names:
+        raise ValueError(f"--en-voice not found in available voices: {args.en_voice}")
+
+    locale_groups = _build_voice_index_sets(voices)
+    ja_indexes = locale_groups.get("ja-*", [])
+    en_indexes = locale_groups.get("en-*", [])
+
+    _print_voice_options(voices)
+    if ja_indexes:
+        _print_filtered_voice_options(voices, ja_indexes, "Japanese")
+    if en_indexes:
+        _print_filtered_voice_options(voices, en_indexes, "English")
+
     if not args.ja_voice:
-        args.ja_voice = _prompt_for_value("Japanese voice (ja-voice): ")
+        if not ja_indexes:
+            raise RuntimeError("No Japanese voices (ja-*) found in available backend voices.")
+        args.ja_voice = _prompt_for_voice_index(
+            "Choose Japanese voice number: ",
+            voices,
+            ja_indexes,
+        )
 
     if not args.en_voice:
-        args.en_voice = _prompt_for_value("English voice (en-voice): ")
+        if not en_indexes:
+            raise RuntimeError("No English voices (en-*) found in available backend voices.")
+        args.en_voice = _prompt_for_voice_index(
+            "Choose English voice number: ",
+            voices,
+            en_indexes,
+        )
+
+    print(
+        "\nSelected voices:"
+        f"\n- Japanese: {args.ja_voice}"
+        f"\n- English: {args.en_voice}"
+    )
 
     return args
 
@@ -104,6 +217,12 @@ def main() -> None:
     parser.add_argument("--post-block-pause-ms", type=int, default=2000)
     parser.add_argument("--ja-voice", help="Voice id/name for Japanese TTS")
     parser.add_argument("--en-voice", help="Voice id/name for English TTS")
+    parser.add_argument(
+        "--tts-backend",
+        default="edge-tts",
+        choices=["edge-tts"],
+        help="TTS backend used to load voice catalog",
+    )
     parser.add_argument(
         "--pick-file",
         action="store_true",
