@@ -41,6 +41,8 @@ def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
             selected = _pick_csv_file_with_dialog()
             if selected:
                 args.input_csv = str(selected)
+            else:
+                print("File picker unavailable or no file selected; falling back to terminal prompt.")
 
         if not args.input_csv:
             args.input_csv = _prompt_for_value("Path to input CSV: ")
@@ -52,6 +54,37 @@ def _resolve_required_args(args: argparse.Namespace) -> argparse.Namespace:
         args.en_voice = _prompt_for_value("English voice (en-voice): ")
 
     return args
+
+
+def _validate_input_csv(csv_path: Path) -> None:
+    if not csv_path.exists() or not csv_path.is_file():
+        raise FileNotFoundError(f"Input CSV does not exist: {csv_path}")
+
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            headers = reader.fieldnames
+    except PermissionError as e:
+        raise ValueError(f"Input CSV is not readable (permission denied): {csv_path}") from e
+    except OSError as e:
+        raise ValueError(f"Unable to open input CSV: {csv_path}") from e
+    except csv.Error as e:
+        raise ValueError(f"Input file is not a readable CSV: {csv_path}") from e
+
+    if not headers:
+        raise ValueError(
+            f"Input CSV must include a header row. Required columns: ja, en. File: {csv_path}"
+        )
+
+    required_columns = {"ja", "en"}
+    available_columns = {h.strip() for h in headers if h is not None}
+    missing_columns = sorted(required_columns - available_columns)
+    if missing_columns:
+        raise ValueError(
+            "Input CSV is missing required column(s): "
+            f"{', '.join(missing_columns)}. "
+            f"Found columns: {', '.join(headers)}"
+        )
 
 
 def _count_rows(csv_path: Path) -> int:
@@ -81,8 +114,7 @@ def main() -> None:
     args = _resolve_required_args(args)
 
     input_csv = Path(args.input_csv).expanduser().resolve()
-    if not input_csv.exists() or not input_csv.is_file():
-        raise FileNotFoundError(f"Input CSV does not exist: {input_csv}")
+    _validate_input_csv(input_csv)
 
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be greater than 0")
