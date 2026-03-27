@@ -144,17 +144,19 @@ def _prompt_for_voice_index(
     voices: List[Dict[str, str]],
     allowed_indexes: List[int],
 ) -> str:
-    allowed_set = set(allowed_indexes)
+    allowed_indexes_sorted = sorted(allowed_indexes)
+    allowed_set = set(allowed_indexes_sorted)
+    allowed_indexes_display = ", ".join(str(idx) for idx in allowed_indexes_sorted)
+    prompt_with_allowed = f"{prompt} (allowed: {allowed_indexes_display}) "
     while True:
-        value = input(prompt).strip()
+        value = input(prompt_with_allowed).strip()
         if not value.isdigit():
-            print("Please enter a number.")
+            print(f"Please enter one of the allowed numbers: {allowed_indexes_display}.")
             continue
 
         selected_index = int(value)
         if selected_index not in allowed_set:
-            low, high = min(allowed_indexes), max(allowed_indexes)
-            print(f"Please choose a valid number from {low} to {high} in the listed group.")
+            print(f"Please choose one of: {allowed_indexes_display}.")
             continue
         return voices[selected_index - 1]["name"]
 
