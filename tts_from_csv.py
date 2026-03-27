@@ -66,6 +66,16 @@ def _prompt_optional_positive_int(prompt: str) -> Optional[int]:
     return value
 
 
+def _prompt_continue_after_preview() -> bool:
+    while True:
+        answer = input("Continue generating remaining batches now? (y/N) ").strip().lower()
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"", "n", "no"}:
+            return False
+        print("Please answer with 'y' or 'n'.")
+
+
 def _non_negative_int(value: str) -> int:
     try:
         parsed = int(value)
@@ -619,17 +629,7 @@ def main() -> None:
                 should_continue = True
                 print("Auto-continue enabled; continuing from batch_0002.")
             else:
-                while True:
-                    answer = input(
-                        "Preview complete. Continue generating remaining batches now? (y/N) "
-                    ).strip().lower()
-                    if answer in {"y", "yes"}:
-                        should_continue = True
-                        break
-                    if answer in {"", "n", "no"}:
-                        should_continue = False
-                        break
-                    print("Please answer with 'y' or 'n'.")
+                should_continue = _prompt_continue_after_preview()
 
             if should_continue:
                 preview_continued = True

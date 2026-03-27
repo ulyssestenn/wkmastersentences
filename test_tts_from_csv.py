@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -6,6 +7,7 @@ from tts_from_csv import (
     _build_batch_segment_metadata,
     _generate_silence_clip,
     _non_negative_int,
+    _prompt_continue_after_preview,
 )
 
 
@@ -71,6 +73,20 @@ class GenerateSilenceClipTests(unittest.TestCase):
             _generate_silence_clip(0, output)
             self.assertTrue(output.exists())
             self.assertEqual(output.stat().st_size, 0)
+
+
+class PreviewPromptTests(unittest.TestCase):
+    def test_prompt_continue_accepts_yes(self) -> None:
+        with patch("builtins.input", side_effect=["y"]):
+            self.assertTrue(_prompt_continue_after_preview())
+
+    def test_prompt_continue_defaults_to_no(self) -> None:
+        with patch("builtins.input", side_effect=[""]):
+            self.assertFalse(_prompt_continue_after_preview())
+
+    def test_prompt_continue_reprompts_on_invalid_answer(self) -> None:
+        with patch("builtins.input", side_effect=["maybe", "yes"]):
+            self.assertTrue(_prompt_continue_after_preview())
 
 
 if __name__ == "__main__":
