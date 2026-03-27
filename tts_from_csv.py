@@ -285,6 +285,90 @@ async def _generate_audio_clip(text: str, voice: str, output_path: Path) -> None
     await communicate.save(str(output_path))
 
 
+def _generate_silence_clip(duration_ms: int, output_path: Path) -> None:
+    duration_seconds = duration_ms / 1000
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=r=24000:cl=mono",
+        "-t",
+        str(duration_seconds),
+        "-q:a",
+        "9",
+        "-acodec",
+        "libmp3lame",
+        str(output_path),
+    ]
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "ffmpeg failed while generating silence clip.\n"
+            f"STDOUT:\n{completed.stdout}\n"
+            f"STDERR:\n{completed.stderr}"
+        )
+
+
+def _build_batch_segment_metadata(
+    batch_rows: List[Dict[str, str]],
+    ja_voice: str,
+    en_voice: str,
+    ja_pause_ms: int,
+    post_block_pause_ms: int,
+) -> List[Dict[str, str]]:
+    segments: List[Dict[str, str]] = []
+    for row_num, row in enumerate(batch_rows, start=1):
+        row_base = f"row_{row_num:04d}"
+        segments.extend(
+            [
+                {
+                    "row_num": str(row_num),
+                    "type": "tts",
+                    "slot": "ja_1",
+                    "language": "ja",
+                    "voice": ja_voice,
+                    "text": row["ja"],
+                    "file": f"{row_base}_ja_1.mp3",
+                },
+                {
+                    "row_num": str(row_num),
+                    "type": "silence",
+                    "slot": "ja_pause",
+                    "duration_ms": str(ja_pause_ms),
+                    "file": f"{row_base}_ja_pause.mp3",
+                },
+                {
+                    "row_num": str(row_num),
+                    "type": "tts",
+                    "slot": "en",
+                    "language": "en",
+                    "voice": en_voice,
+                    "text": row["en"],
+                    "file": f"{row_base}_en.mp3",
+                },
+                {
+                    "row_num": str(row_num),
+                    "type": "tts",
+                    "slot": "ja_2",
+                    "language": "ja",
+                    "voice": ja_voice,
+                    "text": row["ja"],
+                    "file": f"{row_base}_ja_2.mp3",
+                },
+                {
+                    "row_num": str(row_num),
+                    "type": "silence",
+                    "slot": "post_block_pause",
+                    "duration_ms": str(post_block_pause_ms),
+                    "file": f"{row_base}_post_block_pause.mp3",
+                },
+            ]
+        )
+    return segments
+
+
 def _concatenate_audio_clips(clips: List[Path], output_path: Path) -> None:
     if not clips:
         raise ValueError("No audio clips provided for concatenation.")
@@ -418,31 +502,59 @@ def main() -> None:
                     f"ja_voice: {args.ja_voice}, en_voice: {args.en_voice})"
                 )
 
+                segment_metadata = _build_batch_segment_metadata(
+                    batch_rows=batch_rows,
+                    ja_voice=args.ja_voice,
+                    en_voice=args.en_voice,
+                    ja_pause_ms=args.ja_pause_ms,
+                    post_block_pause_ms=args.post_block_pause_ms,
+                )
+                clip_order_by_row: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+                for segment in segment_metadata:
+                    segment_path = temp_dir_path / segment["file"]
+                    if segment["type"] == "tts":
+                        print(
+                            f"  - row {segment['row_num']} tts {segment['slot']}: "
+                            f"{segment['language']} ({segment['voice']})"
+                        )
+                        asyncio.run(
+                            _generate_audio_clip(
+                                text=segment["text"],
+                                voice=segment["voice"],
+                                output_path=segment_path,
+                            )
+                        )
+                        clip_order_by_row[segment["row_num"]].append(
+                            {
+                                "type": "tts",
+                                "slot": segment["slot"],
+                                "language": segment["language"],
+                                "voice": segment["voice"],
+                                "file": segment["file"],
+                            }
+                        )
+                    else:
+                        print(
+                            f"  - row {segment['row_num']} silence {segment['slot']}: "
+                            f"{segment['duration_ms']}ms"
+                        )
+                        _generate_silence_clip(
+                            duration_ms=int(segment["duration_ms"]),
+                            output_path=segment_path,
+                        )
+                        clip_order_by_row[segment["row_num"]].append(
+                            {
+                                "type": "silence",
+                                "slot": segment["slot"],
+                                "duration_ms": segment["duration_ms"],
+                                "file": segment["file"],
+                            }
+                        )
+                    clip_paths.append(segment_path)
+
                 for row_num, row in enumerate(batch_rows, start=1):
-                    row_base = f"row_{row_num:04d}"
-                    ja_first_path = temp_dir_path / f"{row_base}_ja_1.mp3"
-                    en_path = temp_dir_path / f"{row_base}_en.mp3"
-                    ja_second_path = temp_dir_path / f"{row_base}_ja_2.mp3"
-
-                    print(
-                        f"  - row {row_num}: JA -> EN -> JA "
-                        f"(ja_voice: {args.ja_voice}, en_voice: {args.en_voice})"
-                    )
-                    asyncio.run(_generate_audio_clip(row["ja"], args.ja_voice, ja_first_path))
-                    asyncio.run(_generate_audio_clip(row["en"], args.en_voice, en_path))
-                    asyncio.run(_generate_audio_clip(row["ja"], args.ja_voice, ja_second_path))
-
-                    clip_paths.extend([ja_first_path, en_path, ja_second_path])
-                    sentence_manifests.append(
-                        {
-                            **row,
-                            "clip_order": [
-                                {"language": "ja", "voice": args.ja_voice, "file": ja_first_path.name},
-                                {"language": "en", "voice": args.en_voice, "file": en_path.name},
-                                {"language": "ja", "voice": args.ja_voice, "file": ja_second_path.name},
-                            ],
-                        }
-                    )
+                    row_key = str(row_num)
+                    sentence_manifests.append({**row, "clip_order": clip_order_by_row[row_key]})
 
                 _concatenate_audio_clips(clip_paths, batch_audio_path)
 
