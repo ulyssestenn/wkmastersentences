@@ -323,6 +323,11 @@ def main() -> None:
         type=int,
         help="Generate the first N batches",
     )
+    parser.add_argument(
+        "--auto-continue-after-preview",
+        action="store_true",
+        help="When preview mode is enabled, skip prompt and continue remaining batches",
+    )
 
     args = parser.parse_args()
     args = _resolve_required_args(args)
@@ -356,35 +361,90 @@ def main() -> None:
     batches = _chunk_rows(valid_rows, args.batch_size)
     total_possible_batches = len(batches)
 
-    run_is_partial = False
+    audio_files_created = 0
+    preview_stopped = False
+    preview_continued = False
+
+    def _generate_batches(
+        selected_batches: List[List[Dict[str, str]]],
+        start_batch_num: int,
+    ) -> int:
+        files_created = 0
+        total_in_segment = len(selected_batches)
+        for index_in_segment, batch_rows in enumerate(selected_batches, start=1):
+            batch_num = start_batch_num + index_in_segment - 1
+            batch_stem = f"batch_{batch_num:04d}"
+            batch_manifest_path = output_dir / f"{batch_stem}_manifest.json"
+            batch_audio_path = output_dir / f"{batch_stem}.mp3"
+
+            with batch_manifest_path.open("w", encoding="utf-8") as manifest_file:
+                json.dump(batch_rows, manifest_file, ensure_ascii=False, indent=2)
+
+            print(
+                f"[{batch_num}/{total_possible_batches}] Generating {batch_audio_path.name} "
+                f"(rows in batch: {len(batch_rows)}, segment progress: {index_in_segment}/{total_in_segment})"
+            )
+            batch_text = _build_batch_text(batch_rows)
+            asyncio.run(_generate_batch_audio(batch_text, args.ja_voice, batch_audio_path))
+            files_created += 1
+        return files_created
+
     if args.preview_first_batch:
         print(
             f"\nPREVIEW MODE: generating only first batch ({args.batch_size} sentences)"
         )
-        batches = batches[:1]
-        run_is_partial = total_possible_batches > 1
-    elif args.num_batches is not None:
-        if args.num_batches < total_possible_batches:
-            run_is_partial = True
-        batches = batches[: args.num_batches]
+        if batches:
+            audio_files_created += _generate_batches(batches[:1], start_batch_num=1)
 
-    audio_files_created = 0
-    total_batches = len(batches)
-    for batch_num, batch_rows in enumerate(batches, start=1):
-        batch_stem = f"batch_{batch_num:04d}"
-        batch_manifest_path = output_dir / f"{batch_stem}_manifest.json"
-        batch_audio_path = output_dir / f"{batch_stem}.mp3"
+        remaining_batches = batches[1:]
+        if remaining_batches:
+            if args.auto_continue_after_preview:
+                should_continue = True
+                print("Auto-continue enabled; continuing from batch_0002.")
+            else:
+                while True:
+                    answer = input(
+                        "Preview complete. Continue generating remaining batches now? (y/N) "
+                    ).strip().lower()
+                    if answer in {"y", "yes"}:
+                        should_continue = True
+                        break
+                    if answer in {"", "n", "no"}:
+                        should_continue = False
+                        break
+                    print("Please answer with 'y' or 'n'.")
 
-        with batch_manifest_path.open("w", encoding="utf-8") as manifest_file:
-            json.dump(batch_rows, manifest_file, ensure_ascii=False, indent=2)
+            if should_continue:
+                preview_continued = True
+                audio_files_created += _generate_batches(
+                    remaining_batches,
+                    start_batch_num=2,
+                )
+            else:
+                preview_stopped = True
+                print("Preview complete; stopping now. Only preview batch was generated.")
+    else:
+        selected_batches = batches
+        if args.num_batches is not None:
+            selected_batches = batches[: args.num_batches]
+        audio_files_created += _generate_batches(selected_batches, start_batch_num=1)
 
-        print(
-            f"[{batch_num}/{total_batches}] Generating {batch_audio_path.name} "
-            f"(rows in batch: {len(batch_rows)})"
-        )
-        batch_text = _build_batch_text(batch_rows)
-        asyncio.run(_generate_batch_audio(batch_text, args.ja_voice, batch_audio_path))
-        audio_files_created += 1
+    run_is_partial = audio_files_created < total_possible_batches
+
+    summary_mode = "standard"
+    if args.preview_first_batch:
+        if preview_stopped:
+            summary_mode = "preview only (stopped by user)"
+        elif preview_continued:
+            summary_mode = "preview + continued full generation"
+        elif total_possible_batches <= 1:
+            summary_mode = "preview only (no remaining batches)"
+        else:
+            summary_mode = "preview only"
+
+    if args.num_batches is not None and args.num_batches < total_possible_batches:
+        summary_mode = "partial (limited by --num-batches)"
+
 
     print("\nFinal summary")
     print(f"- total CSV rows read: {row_count}")
@@ -392,6 +452,7 @@ def main() -> None:
     print(f"- rows skipped: {skipped_rows}")
     print(f"- total possible batches from CSV: {total_possible_batches}")
     print(f"- batches actually generated: {audio_files_created}")
+    print(f"- execution mode: {summary_mode}")
     if run_is_partial:
         print("- run type: partial")
     else:
