@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import csv
 import json
+import subprocess
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -276,19 +278,47 @@ def _chunk_rows(rows: List[Dict[str, str]], batch_size: int) -> List[List[Dict[s
     return [rows[i : i + batch_size] for i in range(0, len(rows), batch_size)]
 
 
-def _build_batch_text(rows: List[Dict[str, str]]) -> str:
-    segments: List[str] = []
-    for row in rows:
-        segments.append(row["ja"])
-        segments.append(row["en"])
-    return "\n".join(segments)
-
-
-async def _generate_batch_audio(text: str, voice: str, output_path: Path) -> None:
+async def _generate_audio_clip(text: str, voice: str, output_path: Path) -> None:
     import edge_tts
 
     communicate = edge_tts.Communicate(text=text, voice=voice)
     await communicate.save(str(output_path))
+
+
+def _concatenate_audio_clips(clips: List[Path], output_path: Path) -> None:
+    if not clips:
+        raise ValueError("No audio clips provided for concatenation.")
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt", delete=False) as f:
+        concat_manifest = Path(f.name)
+        for clip_path in clips:
+            resolved = clip_path.resolve()
+            escaped = str(resolved).replace("'", "'\\''")
+            f.write(f"file '{escaped}'\n")
+
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(concat_manifest),
+            "-c",
+            "copy",
+            str(output_path),
+        ]
+        completed = subprocess.run(cmd, capture_output=True, text=True)
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "ffmpeg failed while concatenating clips.\n"
+                f"STDOUT:\n{completed.stdout}\n"
+                f"STDERR:\n{completed.stderr}"
+            )
+    finally:
+        concat_manifest.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -377,15 +407,53 @@ def main() -> None:
             batch_manifest_path = output_dir / f"{batch_stem}_manifest.json"
             batch_audio_path = output_dir / f"{batch_stem}.mp3"
 
-            with batch_manifest_path.open("w", encoding="utf-8") as manifest_file:
-                json.dump(batch_rows, manifest_file, ensure_ascii=False, indent=2)
+            with tempfile.TemporaryDirectory(prefix=f"{batch_stem}_") as tmp_dir:
+                temp_dir_path = Path(tmp_dir)
+                clip_paths: List[Path] = []
+                sentence_manifests: List[Dict[str, str]] = []
 
-            print(
-                f"[{batch_num}/{total_possible_batches}] Generating {batch_audio_path.name} "
-                f"(rows in batch: {len(batch_rows)}, segment progress: {index_in_segment}/{total_in_segment})"
-            )
-            batch_text = _build_batch_text(batch_rows)
-            asyncio.run(_generate_batch_audio(batch_text, args.ja_voice, batch_audio_path))
+                print(
+                    f"[{batch_num}/{total_possible_batches}] Generating {batch_audio_path.name} "
+                    f"(rows in batch: {len(batch_rows)}, segment progress: {index_in_segment}/{total_in_segment}, "
+                    f"ja_voice: {args.ja_voice}, en_voice: {args.en_voice})"
+                )
+
+                for row_num, row in enumerate(batch_rows, start=1):
+                    row_base = f"row_{row_num:04d}"
+                    ja_first_path = temp_dir_path / f"{row_base}_ja_1.mp3"
+                    en_path = temp_dir_path / f"{row_base}_en.mp3"
+                    ja_second_path = temp_dir_path / f"{row_base}_ja_2.mp3"
+
+                    print(
+                        f"  - row {row_num}: JA -> EN -> JA "
+                        f"(ja_voice: {args.ja_voice}, en_voice: {args.en_voice})"
+                    )
+                    asyncio.run(_generate_audio_clip(row["ja"], args.ja_voice, ja_first_path))
+                    asyncio.run(_generate_audio_clip(row["en"], args.en_voice, en_path))
+                    asyncio.run(_generate_audio_clip(row["ja"], args.ja_voice, ja_second_path))
+
+                    clip_paths.extend([ja_first_path, en_path, ja_second_path])
+                    sentence_manifests.append(
+                        {
+                            **row,
+                            "clip_order": [
+                                {"language": "ja", "voice": args.ja_voice, "file": ja_first_path.name},
+                                {"language": "en", "voice": args.en_voice, "file": en_path.name},
+                                {"language": "ja", "voice": args.ja_voice, "file": ja_second_path.name},
+                            ],
+                        }
+                    )
+
+                _concatenate_audio_clips(clip_paths, batch_audio_path)
+
+            batch_manifest_payload = {
+                "batch_file": batch_audio_path.name,
+                "ja_voice": args.ja_voice,
+                "en_voice": args.en_voice,
+                "rows": sentence_manifests,
+            }
+            with batch_manifest_path.open("w", encoding="utf-8") as manifest_file:
+                json.dump(batch_manifest_payload, manifest_file, ensure_ascii=False, indent=2)
             files_created += 1
         return files_created
 
