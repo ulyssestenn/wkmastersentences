@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import csv
+import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -206,6 +207,53 @@ def _count_rows(csv_path: Path) -> int:
         return sum(1 for _ in reader)
 
 
+def _load_sentence_pairs(csv_path: Path) -> tuple[List[Dict[str, str]], int]:
+    valid_rows: List[Dict[str, str]] = []
+    skipped_rows = 0
+
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for row_index, row in enumerate(reader, start=2):
+            ja_text = (row.get("ja") or "").strip()
+            en_text = (row.get("en") or "").strip()
+            if not ja_text or not en_text:
+                skipped_rows += 1
+                continue
+
+            payload: Dict[str, str] = {
+                "source_csv_row_index": str(row_index),
+                "ja": ja_text,
+                "en": en_text,
+            }
+
+            subject_id = (row.get("subject_id") or "").strip()
+            if subject_id:
+                payload["subject_id"] = subject_id
+
+            valid_rows.append(payload)
+
+    return valid_rows, skipped_rows
+
+
+def _chunk_rows(rows: List[Dict[str, str]], batch_size: int) -> List[List[Dict[str, str]]]:
+    return [rows[i : i + batch_size] for i in range(0, len(rows), batch_size)]
+
+
+def _build_batch_text(rows: List[Dict[str, str]]) -> str:
+    segments: List[str] = []
+    for row in rows:
+        segments.append(row["ja"])
+        segments.append(row["en"])
+    return "\n".join(segments)
+
+
+async def _generate_batch_audio(text: str, voice: str, output_path: Path) -> None:
+    import edge_tts
+
+    communicate = edge_tts.Communicate(text=text, voice=voice)
+    await communicate.save(str(output_path))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Load sentence CSV and prepare TTS batch settings."
@@ -252,6 +300,34 @@ def main() -> None:
     print(f"- ja_voice: {args.ja_voice}")
     print(f"- en_voice: {args.en_voice}")
     print(f"- csv_rows: {row_count}")
+
+    valid_rows, skipped_rows = _load_sentence_pairs(input_csv)
+    batches = _chunk_rows(valid_rows, args.batch_size)
+
+    audio_files_created = 0
+    total_batches = len(batches)
+    for batch_num, batch_rows in enumerate(batches, start=1):
+        batch_stem = f"batch_{batch_num:04d}"
+        batch_manifest_path = output_dir / f"{batch_stem}_manifest.json"
+        batch_audio_path = output_dir / f"{batch_stem}.mp3"
+
+        with batch_manifest_path.open("w", encoding="utf-8") as manifest_file:
+            json.dump(batch_rows, manifest_file, ensure_ascii=False, indent=2)
+
+        print(
+            f"[{batch_num}/{total_batches}] Generating {batch_audio_path.name} "
+            f"(rows in batch: {len(batch_rows)})"
+        )
+        batch_text = _build_batch_text(batch_rows)
+        asyncio.run(_generate_batch_audio(batch_text, args.ja_voice, batch_audio_path))
+        audio_files_created += 1
+
+    print("\nFinal summary")
+    print(f"- total CSV rows read: {row_count}")
+    print(f"- valid sentence pairs used: {len(valid_rows)}")
+    print(f"- rows skipped: {skipped_rows}")
+    print(f"- number of batch audio files created: {audio_files_created}")
+    print(f"- output directory path: {output_dir}")
 
 
 if __name__ == "__main__":
