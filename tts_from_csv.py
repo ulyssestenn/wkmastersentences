@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import csv
 import json
+import shutil
 import subprocess
 import tempfile
 from collections import defaultdict
@@ -374,6 +375,15 @@ def _generate_silence_clip(duration_ms: int, output_path: Path) -> None:
         )
 
 
+def _ensure_ffmpeg_available() -> None:
+    if shutil.which("ffmpeg"):
+        return
+    raise RuntimeError(
+        "ffmpeg is required to generate audio files, but it was not found in PATH. "
+        "Please install ffmpeg and ensure the 'ffmpeg' executable is available from your terminal."
+    )
+
+
 def _build_batch_segment_metadata(
     batch_rows: List[Dict[str, str]],
     ja_voice: str,
@@ -520,6 +530,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    _ensure_ffmpeg_available()
     args = _resolve_required_args(args)
 
     input_csv = Path(args.input_csv).expanduser().resolve()
