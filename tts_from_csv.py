@@ -307,6 +307,43 @@ async def _generate_audio_clip(text: str, voice: str, output_path: Path) -> None
     await communicate.save(str(output_path))
 
 
+async def _generate_tts_segments_for_batch(
+    tts_segments: List[Tuple[Dict[str, str], Path]],
+) -> None:
+    if not tts_segments:
+        return
+
+    tasks: List["asyncio.Task[None]"] = []
+    for segment, segment_path in tts_segments:
+        tasks.append(
+            asyncio.create_task(
+                _generate_audio_clip(
+                    text=segment["text"],
+                    voice=segment["voice"],
+                    output_path=segment_path,
+                )
+            )
+        )
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    failures: List[str] = []
+    for (segment, segment_path), result in zip(tts_segments, results):
+        if isinstance(result, Exception):
+            failures.append(
+                "row "
+                f"{segment['row_num']} slot {segment['slot']} ({segment['language']}, {segment['voice']}) "
+                f"-> {segment_path.name}: {type(result).__name__}: {result}"
+            )
+
+    if failures:
+        joined_failures = "\n".join(f"- {failure}" for failure in failures)
+        raise RuntimeError(
+            "One or more TTS segments failed during batch generation:\n"
+            f"{joined_failures}"
+        )
+
+
 def _generate_silence_clip(duration_ms: int, output_path: Path) -> None:
     if duration_ms < 0:
         raise ValueError("Silence duration must be a non-negative integer in milliseconds.")
@@ -553,20 +590,17 @@ def main() -> None:
                     post_block_pause_ms=args.post_block_pause_ms,
                 )
                 clip_order_by_row: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+                tts_segments_to_generate: List[Tuple[Dict[str, str], Path]] = []
+
                 for segment in segment_metadata:
                     segment_path = temp_dir_path / segment["file"]
+                    clip_paths.append(segment_path)
                     if segment["type"] == "tts":
                         print(
                             f"  - row {segment['row_num']} tts {segment['slot']}: "
                             f"{segment['language']} ({segment['voice']})"
                         )
-                        asyncio.run(
-                            _generate_audio_clip(
-                                text=segment["text"],
-                                voice=segment["voice"],
-                                output_path=segment_path,
-                            )
-                        )
+                        tts_segments_to_generate.append((segment, segment_path))
                         clip_order_by_row[segment["row_num"]].append(
                             {
                                 "type": "tts",
@@ -594,7 +628,13 @@ def main() -> None:
                                 "file": segment["file"],
                             }
                         )
-                    clip_paths.append(segment_path)
+
+                try:
+                    asyncio.run(_generate_tts_segments_for_batch(tts_segments_to_generate))
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to generate TTS clips for {batch_stem}: {e}"
+                    ) from e
 
                 for row_num, row in enumerate(batch_rows, start=1):
                     row_key = str(row_num)
