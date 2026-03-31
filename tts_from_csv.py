@@ -423,8 +423,14 @@ def _concatenate_audio_clips(clips: List[Path], output_path: Path) -> None:
             "0",
             "-i",
             str(concat_manifest),
-            "-c",
-            "copy",
+            "-acodec",
+            "libmp3lame",
+            "-ar",
+            "24000",
+            "-ac",
+            "1",
+            "-q:a",
+            "9",
             str(output_path),
         ]
         completed = subprocess.run(cmd, capture_output=True, text=True)

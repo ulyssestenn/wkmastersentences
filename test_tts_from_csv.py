@@ -8,6 +8,7 @@ from tts_from_csv import (
     _generate_silence_clip,
     _non_negative_int,
     _prompt_continue_after_preview,
+    _concatenate_audio_clips,
 )
 
 
@@ -74,6 +75,37 @@ class GenerateSilenceClipTests(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertEqual(output.stat().st_size, 0)
 
+
+class ConcatenateAudioClipsTests(unittest.TestCase):
+    @patch("tts_from_csv.subprocess.run")
+    def test_concatenate_audio_clips_transcodes_with_normalized_mp3_settings(self, mock_run) -> None:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+
+        with TemporaryDirectory() as tmp:
+            clips = [Path(tmp) / "a.mp3", Path(tmp) / "b.mp3"]
+            for clip in clips:
+                clip.write_bytes(b"data")
+            output = Path(tmp) / "out.mp3"
+
+            _concatenate_audio_clips(clips, output)
+
+            cmd = mock_run.call_args.args[0]
+            self.assertIn("-f", cmd)
+            self.assertIn("concat", cmd)
+            self.assertIn("-safe", cmd)
+            self.assertIn("0", cmd)
+            self.assertIn("-acodec", cmd)
+            self.assertIn("libmp3lame", cmd)
+            self.assertIn("-ar", cmd)
+            self.assertIn("24000", cmd)
+            self.assertIn("-ac", cmd)
+            self.assertIn("1", cmd)
+            self.assertIn("-q:a", cmd)
+            self.assertIn("9", cmd)
+            self.assertNotIn("-c", cmd)
+            self.assertNotIn("copy", cmd)
 
 class PreviewPromptTests(unittest.TestCase):
     def test_prompt_continue_accepts_yes(self) -> None:
