@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, TextIO, Tuple
 
 
 def _pick_csv_file_with_dialog() -> Optional[Path]:
@@ -238,7 +238,8 @@ def _validate_input_csv(csv_path: Path) -> None:
 
     try:
         with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
+            delimiter = _detect_csv_delimiter(f)
+            reader = csv.DictReader(f, delimiter=delimiter)
             headers = reader.fieldnames
     except PermissionError as e:
         raise ValueError(f"Input CSV is not readable (permission denied): {csv_path}") from e
@@ -265,7 +266,8 @@ def _validate_input_csv(csv_path: Path) -> None:
 
 def _count_rows(csv_path: Path) -> int:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
+        delimiter = _detect_csv_delimiter(f)
+        reader = csv.DictReader(f, delimiter=delimiter)
         return sum(1 for _ in reader)
 
 
@@ -274,7 +276,8 @@ def _load_sentence_pairs(csv_path: Path) -> Tuple[List[Dict[str, str]], int]:
     skipped_rows = 0
 
     with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
+        delimiter = _detect_csv_delimiter(f)
+        reader = csv.DictReader(f, delimiter=delimiter)
         for row_index, row in enumerate(reader, start=2):
             ja_text = (row.get("ja") or "").strip()
             en_text = (row.get("en") or "").strip()
@@ -295,6 +298,20 @@ def _load_sentence_pairs(csv_path: Path) -> Tuple[List[Dict[str, str]], int]:
             valid_rows.append(payload)
 
     return valid_rows, skipped_rows
+
+
+def _detect_csv_delimiter(file_handle: TextIO) -> str:
+    sample = file_handle.read(8192)
+    file_handle.seek(0)
+
+    if not sample.strip():
+        return ","
+
+    try:
+        dialect = csv.Sniffer().sniff(sample)
+    except csv.Error:
+        return ","
+    return dialect.delimiter
 
 
 def _chunk_rows(rows: List[Dict[str, str]], batch_size: int) -> List[List[Dict[str, str]]]:
