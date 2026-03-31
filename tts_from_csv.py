@@ -311,11 +311,8 @@ def _generate_silence_clip(duration_ms: int, output_path: Path) -> None:
     if duration_ms < 0:
         raise ValueError("Silence duration must be a non-negative integer in milliseconds.")
 
-    if duration_ms == 0:
-        output_path.touch()
-        return
-
-    duration_seconds = duration_ms / 1000
+    effective_duration_ms = 1000 if duration_ms == 0 else duration_ms
+    duration_seconds = effective_duration_ms / 1000
     cmd = [
         "ffmpeg",
         "-y",
@@ -576,7 +573,8 @@ def main() -> None:
                     else:
                         print(
                             f"  - row {segment['row_num']} silence {segment['slot']}: "
-                            f"{segment['duration_ms']}ms"
+                            f"{1000 if int(segment['duration_ms']) == 0 else int(segment['duration_ms'])}ms "
+                            f"(requested: {segment['duration_ms']}ms)"
                         )
                         _generate_silence_clip(
                             duration_ms=int(segment["duration_ms"]),
