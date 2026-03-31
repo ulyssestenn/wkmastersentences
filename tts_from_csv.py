@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 def _pick_csv_file_with_dialog() -> Optional[Path]:
@@ -268,7 +268,7 @@ def _count_rows(csv_path: Path) -> int:
         return sum(1 for _ in reader)
 
 
-def _load_sentence_pairs(csv_path: Path) -> tuple[List[Dict[str, str]], int]:
+def _load_sentence_pairs(csv_path: Path) -> Tuple[List[Dict[str, str]], int]:
     valid_rows: List[Dict[str, str]] = []
     skipped_rows = 0
 
