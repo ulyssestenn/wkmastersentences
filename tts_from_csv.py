@@ -639,20 +639,25 @@ def main() -> None:
                             }
                         )
                     else:
+                        requested_duration_ms = int(segment["duration_ms"])
+                        effective_duration_ms = (
+                            1000 if requested_duration_ms == 0 else requested_duration_ms
+                        )
                         print(
                             f"  - row {segment['row_num']} silence {segment['slot']}: "
-                            f"{1000 if int(segment['duration_ms']) == 0 else int(segment['duration_ms'])}ms "
-                            f"(requested: {segment['duration_ms']}ms)"
+                            f"{effective_duration_ms}ms "
+                            f"(requested: {requested_duration_ms}ms)"
                         )
                         _generate_silence_clip(
-                            duration_ms=int(segment["duration_ms"]),
+                            duration_ms=effective_duration_ms,
                             output_path=segment_path,
                         )
                         clip_order_by_row[segment["row_num"]].append(
                             {
                                 "type": "silence",
                                 "slot": segment["slot"],
-                                "duration_ms": segment["duration_ms"],
+                                "duration_ms": str(effective_duration_ms),
+                                "duration_ms_requested": str(requested_duration_ms),
                                 "file": segment["file"],
                             }
                         )
